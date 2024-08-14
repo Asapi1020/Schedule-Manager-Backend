@@ -25,52 +25,52 @@ function signIn(name, password){
   return newUserId;
 }
 
-async function signInWithDiscord(code){
-  const url = "https://discord.com/api/oauth2/token";
+function signInWithDiscord(code){
+  const fetchAccessTokenResult = fetchDiscordAccessToken(code);
 
-  const clientId = PropertiesService.getScriptProperties().getProperty("DISCORD_CLIENT_ID");
-  const clientSecret = PropertiesService.getScriptProperties().getProperty("DISCORD_CLIENT_SECRET");
-  const frontendAddress = PropertiesService.getScriptProperties().getProperty("FRONTEND_ADDRESS");
+  if(fetchAccessTokenResult.statusCode !== 200){
+    return fetchAccessTokenResult;
+  }
 
-  if(!clientId || !clientSecret || !frontendAddress){
-    Logger.log("Error client id or client secret is not set properly");
-    const result = {
-      statusCode: 500,
+  const accessToken = fetchAccessTokenResult.payload;
+  const fetchAccountInfoResult = fetchDiscordAccountInfo(accessToken);
+
+  if(fetchAccountInfoResult.statusCode !== 200){
+    return fetchAccountInfoResult;
+  }
+
+  createUser(fetchAccountInfoResult.payload);
+  return fetchAccessTokenResult;
+}
+
+function createUser(fetchedInfo){
+  const existingAccountInfo = dummyORM.findUnique("Account", {
+    id: fetchedInfo.id
+  });
+
+  if(existingAccountInfo){
+    const newAccountInfo = {
+      ...fetchedInfo,
+      userId: existingAccountInfo.userId
     };
-    return JSON.stringify(result);
+    dummyORM.update("Account", newAccountInfo);
+    return;
   }
 
-  const payload = [
-    `client_id=${encodeURIComponent(clientId)}`,
-    `client_secret=${encodeURIComponent(clientSecret)}`,
-    `code=${encodeURIComponent(code)}`,
-    "grant_type=authorization_code",
-    `redirect_uri=${frontendAddress}/login`
-  ].join('&');;
-
-  const options = {
-    "method": "POST",
-    "headers": {"Content-Type": "application/x-www-form-urlencoded"},
-    "payload": payload
+  const userId = uuid();
+  const accountInfo = {
+    ...fetchedInfo,
+    userId
   }
+  dummyORM.create("Account", accountInfo);
 
-  const response = UrlFetchApp.fetch(url, options);
-  const responseText = response.getContentText();
-  const data = JSON.parse(responseText);
-
-  if(data.error){
-    const result = {
-      statusCode: 401
-    };
-    return JSON.stringify(result);
-  }
-
-  const result = {
-    statusCode: 200,
-    payload: data.access_token
+  const userInfo = {
+    id: userId,
+    name: fetchedInfo.name,
+    groupsId: []
   };
 
-  return result;
+  dummyORM.create("User", userInfo);
 }
 
 function createGroup(name, adminId){
