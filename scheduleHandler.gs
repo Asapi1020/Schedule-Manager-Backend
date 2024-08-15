@@ -5,58 +5,30 @@ function myFunction(){
     return "Hello World!";
 }
 
-function signIn(name, password){
-  const user = dummyORM.findUnique("User", {
-    name,
-    password
-  });
-
-  if(user){
-    return user.id;
-  }
-
-  const newUserId = uuid();
-  dummyORM.create("User", {
-    id: newUserId,
-    name,
-    password,
-    groupsId: []
-  });
-  return newUserId;
-}
-
-function signInWithDiscord(code){
-  const fetchAccessTokenResult = fetchDiscordAccessToken(code);
-
-  if(fetchAccessTokenResult.statusCode !== 200){
-    return fetchAccessTokenResult;
-  }
-
-  const accessToken = fetchAccessTokenResult.payload;
-  const fetchAccountInfoResult = fetchDiscordAccountInfo(accessToken);
-
-  if(fetchAccountInfoResult.statusCode !== 200){
-    return fetchAccountInfoResult;
-  }
-
-  createUser(fetchAccountInfoResult.payload);
-  return fetchAccessTokenResult;
-}
-
-function createUser(fetchedInfo){
+/**
+ * @param{string} - stringified discord account info
+ * @returns result of sheet control
+ */
+function signInWithDiscord(param){
+  const fetchedInfo = JSON.parse(param);
   const existingAccountInfo = dummyORM.findUnique("Account", {
     id: fetchedInfo.id
   });
 
+  // Sign In
   if(existingAccountInfo){
     const newAccountInfo = {
       ...fetchedInfo,
       userId: existingAccountInfo.userId
     };
     dummyORM.update("Account", newAccountInfo);
-    return;
+    return {
+      statusCode: 200,
+      message: "Successfully sign in"
+    };
   }
 
+  // Sign Up
   const userId = uuid();
   const accountInfo = {
     ...fetchedInfo,
@@ -71,6 +43,10 @@ function createUser(fetchedInfo){
   };
 
   dummyORM.create("User", userInfo);
+  return {
+    statusCode: 200,
+    message: "Successfully sign up"
+  };
 }
 
 function createGroup(name, adminId){
