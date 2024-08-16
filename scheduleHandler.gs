@@ -39,7 +39,7 @@ function signInWithDiscord(param){
   const userInfo = {
     id: userId,
     name: fetchedInfo.name,
-    groupsId: []
+    groupsId: JSON.stringify([])
   };
 
   dummyORM.create("User", userInfo);
@@ -49,66 +49,57 @@ function signInWithDiscord(param){
   };
 }
 
-function createGroup(name, adminId){
-  const groupId = uuid();
-  dummyORM.create("Group", {
-    id: groupId,
-    name,
-    usersId: [adminId],
-    adminId
+function fetchUserInfo(accountId){
+  const accountInfo = dummyORM.findUnique("Account", {
+    id: accountId
   });
 
-  return groupId;
+  if(!accountInfo){
+    return {
+      statusCode: 404,
+      message: "Account not found"
+    };
+  }
+
+  const userInfo = dummyORM.findUnique("User", {
+    id: accountInfo.userId
+  });
+
+  if(!userInfo){
+    return {
+      statusCode: 500,
+      message: "User not found but account exists"
+    };
+  }
+
+  return {
+    statusCode: 200,
+    message: {
+      id: userInfo.id,
+      accountId,
+      name: userInfo.name,
+      avatarHash: accountInfo.avatarHash,
+      groupsId: JSON.parse(userInfo.groupsId)
+    }
+  }
 }
 
-function joinGroup(userId, groupId){
-  const user = dummyORM.findUnique("User", {id: userId});
-  if(!user){
-    Logger.log(`Error: Invalid user id ${userId}`);
-    return "401";
+function changeUserName(userId, newName){
+  const userInfo = dummyORM.findUnique("User", {
+    id: userId
+  });
+
+  if(!userInfo){
+    return {
+      statusCode: 404,
+      message: "User not found"
+    };
   }
 
-  if(user.groupsId.includes(groupId)){
-    Logger.log("Already joined");
-    return "200";
-  }
-
-  const group = dummyORM.findUnique("Group", {id: groupId});
-  if(!group){
-    Logger.log(`Error: Invalid group id ${groupId}`);
-    return "400";
-  }
-
-  user.groupsId.push(groupId);
-  dummyORM.update("User", user);
-  
-  group.usersId.push(userId);
-  dummyORM.update("Group", group);
-
-  return "200";
-}
-
-function leaveGroup(userId, groupId){
-  const user = dummyORM.findUnique("User", {id: userId});
-  if(!user){
-    Logger.log(`Error: Invalid user id ${userId}`);
-    return "401";
-  }
-
-  if(!user.groupsId.includes(groupId)){
-    Logger.log("Already leaved");
-    return "200";
-  }
-
-  const group = dummyORM.findUnique("Group", {id: groupId});
-  if(!group){
-    Logger.log(`Error: Invalid group id ${groupId}`);
-    return "400";
-  }
-
-  user.groupsId = user.groupsId.filter(id => id !== groupId);
-  dummyORM.update("User", user);
-  group.usersId = group.usersId.filter(id => id !== userId);
-  dummyORM.update("Group", group);
-  return "200";
+  userInfo.name = newName;
+  dummyORM.update("User", userInfo);
+  return {
+    statusCode: 200,
+    message: "Successfully update user info"
+  };
 }
