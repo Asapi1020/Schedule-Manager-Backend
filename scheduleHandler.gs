@@ -103,3 +103,33 @@ function changeUserName(userId, newName){
     message: "Successfully update user info"
   };
 }
+
+function addNewGroup(userId, groupName){
+  const adminUser = dummyORM.findUnique("User", {
+    id: userId
+  });
+  if(!adminUser){
+    return {
+      statusCode: 400,
+      message: "user not found"
+    };
+  }
+
+  const group = {
+    id: uuid(),
+    name: groupName,
+    usersId: JSON.stringify([userId]),
+    adminId: userId
+  };
+  dummyORM.create("Group", group);
+  
+  const groupsIdArray = JSON.parse(adminUser.groupsId);
+  groupsIdArray.push(group.id);
+  adminUser.groupsId = JSON.stringify(groupsIdArray);
+  dummyORM.update("User", adminUser);
+
+  return {
+    statusCode: 200,
+    message: group
+  }
+}
